@@ -1,24 +1,44 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Modal from '../common/Modal';
-import { TROOP_META, TROOP_TYPES, FC_OPTIONS, LANCER_ICON_SRC, freshTroopState } from '../../data/troopDefs';
+import TroopsFields from '../common/TroopsFields';
+import { freshTroopState } from '../../data/troopDefs';
 import { useAppData } from '../../context/AppDataContext';
 
 export default function AddAccountModal({ open, onClose }) {
-  const { createAccount, players } = useAppData();
+  const { createAccount, players, accounts } = useAppData();
   const [name, setName] = useState('');
   const [playerId, setPlayerId] = useState('');
+  const [password, setPassword] = useState('');
   const [power, setPower] = useState('');
   const [march, setMarch] = useState('');
   const [troops, setTroops] = useState(freshTroopState());
   const [nameError, setNameError] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const trimmedId = playerId.trim();
+  const matchedPlayer = useMemo(
+    () => (trimmedId ? players.find((p) => p.id === trimmedId) : null),
+    [players, trimmedId]
+  );
+  const matchedAccount = useMemo(
+    () => (matchedPlayer ? accounts.find((a) => a.player_id === matchedPlayer.id) : null),
+    [accounts, matchedPlayer]
+  );
+  const idIsTaken = !!matchedPlayer?.auth_user_id;
+  // Claiming an ID (new or existing-unlinked) needs its own login set up.
+  const needsPassword = !!trimmedId && !idIsTaken;
 
   function resetForm() {
     setName('');
     setPlayerId('');
+    setPassword('');
     setPower('');
     setMarch('');
     setTroops(freshTroopState());
     setNameError(false);
+    setPasswordError(false);
+    setSubmitError('');
   }
 
   function handleClose() {
@@ -26,28 +46,53 @@ export default function AddAccountModal({ open, onClose }) {
     onClose();
   }
 
-  function updateTroopField(type, field, value) {
-    setTroops((prev) => {
-      const next = { ...prev, [type]: { ...prev[type], [field]: value } };
-      if (field === 'tier' && value !== 'T12') next[type].skill = 0;
-      return next;
-    });
+  function handlePlayerIdChange(value) {
+    setPlayerId(value);
+    const trimmed = value.trim();
+    const player = trimmed ? players.find((p) => p.id === trimmed) : null;
+    if (player && !player.auth_user_id) {
+      const account = accounts.find((a) => a.player_id === player.id);
+      setName(account ? account.name : player.name);
+      if (account) {
+        setPower(account.power);
+        setMarch(account.march);
+        setTroops(account.troops || freshTroopState());
+      }
+    }
   }
 
   async function handleSubmit() {
+    if (idIsTaken) return;
+    let hasError = false;
     if (!name.trim()) {
       setNameError(true);
-      return;
+      hasError = true;
+    } else {
+      setNameError(false);
     }
-    setNameError(false);
-    await createAccount({
-      name: name.trim(),
-      playerId: playerId || null,
-      power: power.trim() || '0',
-      march: march.trim() || '0',
-      troops,
-    });
-    handleClose();
+    if (needsPassword && !password) {
+      setPasswordError(true);
+      hasError = true;
+    } else {
+      setPasswordError(false);
+    }
+    if (hasError) return;
+
+    setSubmitError('');
+    try {
+      await createAccount({
+        name: name.trim(),
+        playerId: trimmedId || null,
+        power: power.trim() || '0',
+        march: march.trim() || '0',
+        troops,
+        existingAccountKey: matchedAccount?.key,
+        password,
+      });
+      handleClose();
+    } catch {
+      setSubmitError('Could not create that account - the player ID may already be taken. Please try again.');
+    }
   }
 
   return (
@@ -61,7 +106,7 @@ export default function AddAccountModal({ open, onClose }) {
           <button className="btn-secondary" onClick={handleClose}>
             Cancel
           </button>
-          <button className="btn-primary" onClick={handleSubmit}>
+          <button className="btn-primary" onClick={handleSubmit} disabled={idIsTaken}>
             Create Account
           </button>
         </>
@@ -79,73 +124,39 @@ export default function AddAccountModal({ open, onClose }) {
           />
         </div>
         <div className="field">
-          <label>Linked Player (optional)</label>
-          <select value={playerId} onChange={(e) => setPlayerId(e.target.value)}>
-            <option value="">None</option>
-            {players.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.id})
-              </option>
-            ))}
-          </select>
+          <label>Player ID</label>
+          <input
+            type="text"
+            className={idIsTaken ? 'field-error' : ''}
+            value={playerId}
+            onChange={(e) => handlePlayerIdChange(e.target.value)}
+            placeholder="e.g. 80472391"
+          />
+          {idIsTaken && <div className="field-hint error">This player ID is already in use.</div>}
+          {!idIsTaken && matchedPlayer && (
+            <div className="field-hint">
+              Existing player found - {matchedAccount ? 'account details prefilled below.' : 'fields prefilled.'}
+            </div>
+          )}
         </div>
       </div>
 
+      {needsPassword && (
+        <div className="field">
+          <label>Set a Password for This ID</label>
+          <input
+            type="password"
+            className={passwordError ? 'field-error' : ''}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+          />
+          <div className="field-hint">This lets you log in later using this player ID too.</div>
+        </div>
+      )}
+
       <label className="modal-section-label">Troops Setup</label>
-      <div id="newAccTroopsContainer">
-        {TROOP_TYPES.map((type) => {
-          const meta = TROOP_META[type];
-          const data = troops[type];
-          return (
-            <div className="modal-troop-row" key={type}>
-              <div className="troop-config-header">
-                <span className={`troop-config-icon ${meta.colorClass}`}>
-                  {type === 'lancer' ? (
-                    <img src={LANCER_ICON_SRC} alt="Lancer" style={{ width: 16, height: 16, display: 'block' }} />
-                  ) : type === 'infantry' ? (
-                    '\u{1F6E1}\uFE0F'
-                  ) : (
-                    '\u{1F3F9}'
-                  )}
-                </span>
-                <span className={`troop-config-name ${meta.colorClass}`}>{meta.label}</span>
-              </div>
-              <div className="troop-config-fields">
-                <div className="field">
-                  <label>Troops Level</label>
-                  <select value={data.fc} onChange={(e) => updateTroopField(type, 'fc', e.target.value)}>
-                    {FC_OPTIONS.map((fc) => (
-                      <option key={fc} value={fc}>
-                        {fc}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Troops Type</label>
-                  <select value={data.tier} onChange={(e) => updateTroopField(type, 'tier', e.target.value)}>
-                    <option value="T11">T11 - Hélios</option>
-                    <option value="T12">T12 - Exalted</option>
-                  </select>
-                </div>
-                <div className={`field ${data.tier === 'T12' ? '' : 'field-disabled'}`}>
-                  <label>Troops Skill</label>
-                  <select
-                    disabled={data.tier !== 'T12'}
-                    value={data.skill}
-                    onChange={(e) => updateTroopField(type, 'skill', parseInt(e.target.value, 10))}
-                  >
-                    <option value={0}>Skill 0</option>
-                    <option value={1}>Skill 1</option>
-                    <option value={2}>Skill 2</option>
-                    <option value={3}>Skill 3</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <TroopsFields troops={troops} onChange={setTroops} />
 
       <div className="field-row" style={{ marginTop: 4 }}>
         <div className="field">
@@ -157,6 +168,7 @@ export default function AddAccountModal({ open, onClose }) {
           <input type="text" value={march} onChange={(e) => setMarch(e.target.value)} placeholder="e.g. 100,000" />
         </div>
       </div>
+      {submitError && <div className="field-hint error">{submitError}</div>}
     </Modal>
   );
 }

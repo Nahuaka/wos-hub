@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppDataProvider, useAppData } from './context/AppDataContext';
+import { useAuth } from './context/AuthContext';
+import AuthPage from './pages/AuthPage';
 import Sidebar from './components/sidebar/Sidebar';
 import AccountLayout from './pages/AccountLayout';
 import OverviewPage from './pages/OverviewPage';
@@ -71,6 +73,16 @@ function AppShell() {
 }
 
 export default function App() {
+  const { loading, session } = useAuth();
+
+  if (loading) {
+    return <div style={{ padding: 60, color: 'var(--text-dim)' }}>Loading WOS Hub&hellip;</div>;
+  }
+
+  if (!session) {
+    return <AuthPage />;
+  }
+
   return (
     <AppDataProvider>
       <AppShell />

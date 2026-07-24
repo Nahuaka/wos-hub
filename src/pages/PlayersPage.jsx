@@ -4,6 +4,7 @@ import { permissionClass } from '../lib/utils';
 import { ROLE_DEFS } from '../data/roleDefs';
 import RoleMultiSelect from '../components/common/RoleMultiSelect';
 import MultiSelectFilter from '../components/common/MultiSelectFilter';
+import AddPlayerModal from '../components/sidebar/AddPlayerModal';
 
 const PERMISSION_LEVELS = ['Admin', 'Team Maker', 'Battle Strat', 'Player Manager', 'Players'];
 
@@ -22,6 +23,7 @@ export default function PlayersPage() {
   const [permFilter, setPermFilter] = useState([]);
   const [allianceFilter, setAllianceFilter] = useState([]);
   const [roleFilter, setRoleFilter] = useState([]);
+  const [addPlayerOpen, setAddPlayerOpen] = useState(false);
 
   const allianceColor = (tag) => alliances.find((a) => a.tag === tag)?.color || 'var(--text-dimmer)';
 
@@ -54,10 +56,18 @@ export default function PlayersPage() {
     <div>
       <div className="section-title-row">
         <div className="section-title">PLAYERS</div>
-        <div className="players-count">
-          {filtered.length} of {players.length} registered
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div className="players-count">
+            {filtered.length} of {players.length} registered
+          </div>
+          {isCurrentUserAdmin && (
+            <button className="btn-primary" onClick={() => setAddPlayerOpen(true)}>
+              Add Player
+            </button>
+          )}
         </div>
       </div>
+      <AddPlayerModal open={addPlayerOpen} onClose={() => setAddPlayerOpen(false)} />
 
       <div className="card players-toolbar">
         <div className="players-search">

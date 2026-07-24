@@ -36,3 +36,8 @@ export function eventSlug(name, existingIds = []) {
   }
   return slug;
 }
+
+// Supabase Auth needs an email; player IDs log in with this synthetic one.
+export function toSyntheticEmail(playerId) {
+  return `state1518-${playerId}@wos-hub.local`;
+}

@@ -36,13 +36,13 @@ function seedData() {
   ];
 
   const players = [
-    { id: '80472391', name: 'IceWarden', alliance_tag: 'FLG', permission: 'Admin', roles: ['rally-lead'], created_at: ts() },
-    { id: '80472455', name: 'FrostByte', alliance_tag: 'FLG', permission: 'Team Maker', roles: ['potential-rally-lead', 'gather'], created_at: ts() },
-    { id: '80471902', name: 'Snowclaw', alliance_tag: 'FLG', permission: 'Battle Strat', roles: ['joiner'], created_at: ts() },
-    { id: '80473310', name: 'Glacia', alliance_tag: 'FLG', permission: 'Player Manager', roles: [], created_at: ts() },
-    { id: '80469981', name: 'Blizzard', alliance_tag: 'WNT', permission: 'Players', roles: ['looter'], created_at: ts() },
-    { id: '80470244', name: 'Permafrost', alliance_tag: 'WNT', permission: 'Players', roles: [], created_at: ts() },
-    { id: '80468120', name: 'Thundrix', alliance_tag: 'TDR', permission: 'Battle Strat', roles: ['gather'], created_at: ts() },
+    { id: '80472391', name: 'IceWarden', alliance_tag: 'FLG', permission: 'Admin', roles: ['rally-lead'], auth_user_id: null, owner_player_id: null, created_at: ts() },
+    { id: '80472455', name: 'FrostByte', alliance_tag: 'FLG', permission: 'Team Maker', roles: ['potential-rally-lead', 'gather'], auth_user_id: null, owner_player_id: null, created_at: ts() },
+    { id: '80471902', name: 'Snowclaw', alliance_tag: 'FLG', permission: 'Battle Strat', roles: ['joiner'], auth_user_id: null, owner_player_id: null, created_at: ts() },
+    { id: '80473310', name: 'Glacia', alliance_tag: 'FLG', permission: 'Player Manager', roles: [], auth_user_id: null, owner_player_id: null, created_at: ts() },
+    { id: '80469981', name: 'Blizzard', alliance_tag: 'WNT', permission: 'Players', roles: ['looter'], auth_user_id: null, owner_player_id: null, created_at: ts() },
+    { id: '80470244', name: 'Permafrost', alliance_tag: 'WNT', permission: 'Players', roles: [], auth_user_id: null, owner_player_id: null, created_at: ts() },
+    { id: '80468120', name: 'Thundrix', alliance_tag: 'TDR', permission: 'Battle Strat', roles: ['gather'], auth_user_id: null, owner_player_id: null, created_at: ts() },
   ];
 
   const accounts = [
@@ -52,7 +52,7 @@ function seedData() {
       name: '[FLG] ICEWARDEN',
       power: '142.8M',
       march: '250,000',
-      furnace: 30,
+      furnace: '30',
       rally_lead: true,
       snow_ape_level: 1,
       troops: {
@@ -81,7 +81,7 @@ function seedData() {
       name: '[FLG] FROSTBYTE',
       power: '98.4M',
       march: '180,000',
-      furnace: 25,
+      furnace: '25',
       rally_lead: true,
       snow_ape_level: 1,
       troops: {
@@ -129,9 +129,11 @@ function loadState() {
 }
 
 const state = loadState();
-// Backfill for state persisted before the `roles` field existed.
+// Backfill for state persisted before these fields existed.
 state.players.forEach((p) => {
   if (!p.roles) p.roles = [];
+  if (p.auth_user_id === undefined) p.auth_user_id = null;
+  if (p.owner_player_id === undefined) p.owner_player_id = null;
 });
 
 function persist() {
@@ -193,6 +195,42 @@ export async function updatePlayerRoles(id, roles) {
   state.players[idx] = { ...state.players[idx], roles };
   persist();
   return state.players[idx];
+}
+
+export async function updatePlayerInfo(id, patch) {
+  const idx = state.players.findIndex((p) => p.id === id);
+  if (idx === -1) throw new Error(`Player "${id}" not found.`);
+  state.players[idx] = { ...state.players[idx], ...patch };
+  persist();
+  return state.players[idx];
+}
+
+export async function insertPlayer(player) {
+  const row = { roles: [], auth_user_id: null, owner_player_id: null, created_at: new Date().toISOString(), ...player };
+  state.players.push(row);
+  persist();
+  return row;
+}
+
+export async function linkPlayerAuthUser(id, authUserId, ownerPlayerId = null) {
+  const idx = state.players.findIndex((p) => p.id === id);
+  if (idx === -1) throw new Error(`Player "${id}" not found.`);
+  state.players[idx] = { ...state.players[idx], auth_user_id: authUserId, owner_player_id: ownerPlayerId };
+  persist();
+  return state.players[idx];
+}
+
+// Pre-login existence/prefill check. Mirrors the shape of the Supabase RPC
+// (get_player_registration_status) so both backends look identical to
+// callers - local mode has no real auth gate, so this can just read state
+// directly instead of needing its own security-definer function.
+export async function checkPlayerRegistrationStatus(id) {
+  const player = state.players.find((p) => p.id === id) || null;
+  if (!player) return { status: 'not_found', player: null, account: null };
+  if (player.auth_user_id) return { status: 'linked', player: null, account: null };
+  const { id: playerId, name, alliance_tag, permission, roles } = player;
+  const account = state.accounts.find((a) => a.player_id === id) || null;
+  return { status: 'unlinked', player: { id: playerId, name, alliance_tag, permission, roles }, account };
 }
 
 export async function deletePlayer(id) {
