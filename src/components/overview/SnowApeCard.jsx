@@ -20,7 +20,7 @@ export default function SnowApeCard() {
           </div>
           <div className="snow-ape-info">
             <div className="pet-name">Snow Ape</div>
-            <div className="pet-desc">Companion pet</div>
+            <div className="pet-desc">Boost march capacity</div>
           </div>
           <LevelSelect
             className="pet-level-select snow-ape-select"
