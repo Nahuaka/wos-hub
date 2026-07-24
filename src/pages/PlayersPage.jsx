@@ -4,6 +4,7 @@ import { permissionClass } from '../lib/utils';
 import { ROLE_DEFS } from '../data/roleDefs';
 import RoleMultiSelect from '../components/common/RoleMultiSelect';
 import MultiSelectFilter from '../components/common/MultiSelectFilter';
+import AllianceSelect from '../components/common/AllianceSelect';
 import AddPlayerModal from '../components/sidebar/AddPlayerModal';
 
 const PERMISSION_LEVELS = ['Admin', 'Team Maker', 'Battle Strat', 'Player Manager', 'Players'];
@@ -17,15 +18,21 @@ const TRASH_ICON = (
 );
 
 export default function PlayersPage() {
-  const { players, alliances, isCurrentUserAdmin, setPlayerPermission, setPlayerRoles, removePlayer } =
-    useAppData();
+  const {
+    players,
+    alliances,
+    isCurrentUserAdmin,
+    myOwnerRoot,
+    setPlayerAlliance,
+    setPlayerPermission,
+    setPlayerRoles,
+    removePlayer,
+  } = useAppData();
   const [search, setSearch] = useState('');
   const [permFilter, setPermFilter] = useState([]);
   const [allianceFilter, setAllianceFilter] = useState([]);
   const [roleFilter, setRoleFilter] = useState([]);
   const [addPlayerOpen, setAddPlayerOpen] = useState(false);
-
-  const allianceColor = (tag) => alliances.find((a) => a.tag === tag)?.color || 'var(--text-dimmer)';
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -116,14 +123,19 @@ export default function PlayersPage() {
             {filtered.length === 0 && (
               <div className="players-empty">No players match your search or filters.</div>
             )}
-            {filtered.map((p) => (
+            {filtered.map((p) => {
+              const canEditAlliance = isCurrentUserAdmin || (p.owner_player_id || p.id) === myOwnerRoot;
+              return (
               <div className="players-row" key={p.id}>
                 <div className="p-name">{p.name}</div>
                 <div className="p-alliance">
-                  {p.alliance_tag && (
-                    <span className="p-alliance-dot" style={{ background: allianceColor(p.alliance_tag) }} />
-                  )}
-                  {p.alliance_tag}
+                  <AllianceSelect
+                    alliances={alliances}
+                    value={p.alliance_tag}
+                    editable={canEditAlliance}
+                    onChange={(tag) => setPlayerAlliance(p.id, tag)}
+                    placeholder="—"
+                  />
                 </div>
                 <div className="p-id">{p.id}</div>
                 <div>
@@ -154,7 +166,8 @@ export default function PlayersPage() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

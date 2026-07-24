@@ -225,10 +225,51 @@
   }
   .profile-avatar svg{ width:40px;height:40px; opacity:0.9;}
   .profile-info{ flex:1; min-width:0; }
+  .profile-name-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .profile-name{
     font-size: 30px; font-weight:800; letter-spacing:0.5px;
     text-transform:uppercase;
   }
+
+  /* Alliance shown as plain text (with color dot); click reveals a picker
+     if editable - looks nothing like a boxed <select> until interacted with. */
+  .alliance-display{
+    display:inline-flex; align-items:center; gap:7px;
+    font-size:13px; font-weight:700; color: var(--text-dim);
+  }
+  .alliance-picker{ position:relative; }
+  .alliance-picker-trigger{
+    display:inline-flex; align-items:center; gap:7px;
+    background:none; border:none; padding:2px 4px; margin:-2px -4px;
+    border-radius:6px;
+    font-family:inherit; font-size:13px; font-weight:700; color: var(--text-dim);
+    cursor:pointer;
+    transition: background .15s, color .15s;
+  }
+  .alliance-picker-trigger:hover{ background: rgba(255,255,255,0.05); color: var(--text); }
+  .alliance-picker-chevron{ width:13px; height:13px; color: var(--text-dimmer); }
+  .alliance-picker-menu{
+    position:absolute; top:calc(100% + 6px); left:0; z-index:20;
+    min-width:160px;
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:6px;
+    box-shadow:0 12px 28px rgba(0,0,0,0.45);
+  }
+  .alliance-picker-option{
+    width:100%;
+    display:flex; align-items:center; gap:9px;
+    background:none; border:none;
+    font-family:inherit; font-size:13px; font-weight:600;
+    color: var(--text);
+    padding:8px 10px;
+    border-radius:7px;
+    cursor:pointer;
+    text-align:left;
+    white-space:nowrap;
+  }
+  .alliance-picker-option:hover{ background: rgba(255,255,255,0.05); }
   .profile-id{
     display:flex; align-items:center; gap:8px;
     color: var(--text-dimmer); font-size:13px; margin-top:8px;

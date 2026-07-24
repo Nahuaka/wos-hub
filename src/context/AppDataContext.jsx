@@ -233,6 +233,14 @@ export function AppDataProvider({ children }) {
   }, []);
 
   // ---- Players ----
+  const setPlayerAlliance = useCallback((id, allianceTag) => {
+    setPlayers((prev) => prev.map((p) => (p.id === id ? { ...p, alliance_tag: allianceTag || null } : p)));
+    api.updatePlayerInfo(id, { alliance_tag: allianceTag || null }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update player alliance:', err);
+    });
+  }, []);
+
   const setPlayerPermission = useCallback((id, permission) => {
     setPlayers((prev) => prev.map((p) => (p.id === id ? { ...p, permission } : p)));
     api.updatePlayerPermission(id, permission).catch((err) => {
@@ -318,6 +326,7 @@ export function AppDataProvider({ children }) {
     error,
     accounts,
     myAccounts,
+    myOwnerRoot,
     currentAccount,
     currentAccountKey,
     setCurrentAccountKey,
@@ -328,6 +337,7 @@ export function AppDataProvider({ children }) {
     createAccount,
     removeAccount,
     players,
+    setPlayerAlliance,
     setPlayerPermission,
     setPlayerRoles,
     addPlayer,
