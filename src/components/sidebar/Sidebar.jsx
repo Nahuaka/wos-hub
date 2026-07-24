@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
 import AccountRow from './AccountRow';
 import SidebarEventRow from './SidebarEventRow';
@@ -32,8 +32,20 @@ export default function Sidebar() {
   const { accounts, currentAccountKey, setCurrentAccountKey, events } = useAppData();
   const [addAccountOpen, setAddAccountOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
+  // Admin pages (Players, Event Management, Settings) are their own
+  // distinct views - an account row shouldn't show as "active" alongside
+  // them, since no account is actually being viewed there.
+  const onAdminPage = location.pathname.startsWith('/admin');
   const ongoingEvents = events.filter((e) => !e.finished);
+
+  function handleAccountSelect(key) {
+    setCurrentAccountKey(key);
+    if (onAdminPage) {
+      navigate('/overview');
+    }
+  }
 
   function handleEventClick(eventId) {
     // Opens the event detail via a route outside /admin - that section is
@@ -55,8 +67,8 @@ export default function Sidebar() {
           <AccountRow
             key={account.key}
             account={account}
-            active={account.key === currentAccountKey}
-            onSelect={setCurrentAccountKey}
+            active={!onAdminPage && account.key === currentAccountKey}
+            onSelect={handleAccountSelect}
           />
         ))}
       </div>
