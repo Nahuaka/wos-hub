@@ -1,14 +1,25 @@
 import { useState } from 'react';
 import { useAppData } from '../../context/AppDataContext';
+import AllianceSelect from './AllianceSelect';
 
 export default function ProfileCard() {
-  const { currentAccount, patchCurrentAccount } = useAppData();
+  const {
+    currentAccount,
+    patchCurrentAccount,
+    players,
+    alliances,
+    isCurrentUserAdmin,
+    myOwnerRoot,
+    setPlayerAlliance,
+  } = useAppData();
   const [copied, setCopied] = useState(false);
 
   if (!currentAccount) return null;
 
   const rallyLeadOn = currentAccount.rally_lead !== false;
   const displayId = currentAccount.player_id || currentAccount.key;
+  const player = players.find((p) => p.id === currentAccount.player_id);
+  const canEditAlliance = !!player && (isCurrentUserAdmin || (player.owner_player_id || player.id) === myOwnerRoot);
 
   async function handleCopy() {
     try {
@@ -46,7 +57,17 @@ export default function ProfileCard() {
         </svg>
       </div>
       <div className="profile-info">
-        <div className="profile-name">{currentAccount.name}</div>
+        <div className="profile-name-row">
+          {player && (
+            <AllianceSelect
+              alliances={alliances}
+              value={player.alliance_tag}
+              editable={canEditAlliance}
+              onChange={(tag) => setPlayerAlliance(player.id, tag)}
+            />
+          )}
+          <div className="profile-name">{currentAccount.name}</div>
+        </div>
         <div className="profile-id">
           ID <span>{displayId}</span>{' '}
           <span className={`copy${copied ? ' copied' : ''}`} onClick={handleCopy} title="Copy ID">
