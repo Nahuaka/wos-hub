@@ -8,14 +8,14 @@ insert into alliances (tag, color) values
   ('TDR', '#ff9d42')
 on conflict (tag) do nothing;
 
-insert into players (id, name, alliance_tag, permission) values
-  ('80472391', 'IceWarden',  'FLG', 'Admin'),
-  ('80472455', 'FrostByte',  'FLG', 'Team Maker'),
-  ('80471902', 'Snowclaw',   'FLG', 'Battle Strat'),
-  ('80473310', 'Glacia',     'FLG', 'Player Manager'),
-  ('80469981', 'Blizzard',   'WNT', 'Players'),
-  ('80470244', 'Permafrost', 'WNT', 'Players'),
-  ('80468120', 'Thundrix',   'TDR', 'Battle Strat')
+insert into players (id, name, alliance_tag, permission, roles) values
+  ('80472391', 'IceWarden',  'FLG', 'Admin',          '["rally-lead"]'::jsonb),
+  ('80472455', 'FrostByte',  'FLG', 'Team Maker',     '["potential-rally-lead","gather"]'::jsonb),
+  ('80471902', 'Snowclaw',   'FLG', 'Battle Strat',   '["joiner"]'::jsonb),
+  ('80473310', 'Glacia',     'FLG', 'Player Manager', '[]'::jsonb),
+  ('80469981', 'Blizzard',   'WNT', 'Players',        '["looter"]'::jsonb),
+  ('80470244', 'Permafrost', 'WNT', 'Players',        '[]'::jsonb),
+  ('80468120', 'Thundrix',   'TDR', 'Battle Strat',   '["gather"]'::jsonb)
 on conflict (id) do nothing;
 
 insert into accounts (key, player_id, name, power, march, furnace, rally_lead, snow_ape_level, troops, rally, heroes) values

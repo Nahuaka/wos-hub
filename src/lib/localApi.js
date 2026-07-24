@@ -36,13 +36,13 @@ function seedData() {
   ];
 
   const players = [
-    { id: '80472391', name: 'IceWarden', alliance_tag: 'FLG', permission: 'Admin', created_at: ts() },
-    { id: '80472455', name: 'FrostByte', alliance_tag: 'FLG', permission: 'Team Maker', created_at: ts() },
-    { id: '80471902', name: 'Snowclaw', alliance_tag: 'FLG', permission: 'Battle Strat', created_at: ts() },
-    { id: '80473310', name: 'Glacia', alliance_tag: 'FLG', permission: 'Player Manager', created_at: ts() },
-    { id: '80469981', name: 'Blizzard', alliance_tag: 'WNT', permission: 'Players', created_at: ts() },
-    { id: '80470244', name: 'Permafrost', alliance_tag: 'WNT', permission: 'Players', created_at: ts() },
-    { id: '80468120', name: 'Thundrix', alliance_tag: 'TDR', permission: 'Battle Strat', created_at: ts() },
+    { id: '80472391', name: 'IceWarden', alliance_tag: 'FLG', permission: 'Admin', roles: ['rally-lead'], created_at: ts() },
+    { id: '80472455', name: 'FrostByte', alliance_tag: 'FLG', permission: 'Team Maker', roles: ['potential-rally-lead', 'gather'], created_at: ts() },
+    { id: '80471902', name: 'Snowclaw', alliance_tag: 'FLG', permission: 'Battle Strat', roles: ['joiner'], created_at: ts() },
+    { id: '80473310', name: 'Glacia', alliance_tag: 'FLG', permission: 'Player Manager', roles: [], created_at: ts() },
+    { id: '80469981', name: 'Blizzard', alliance_tag: 'WNT', permission: 'Players', roles: ['looter'], created_at: ts() },
+    { id: '80470244', name: 'Permafrost', alliance_tag: 'WNT', permission: 'Players', roles: [], created_at: ts() },
+    { id: '80468120', name: 'Thundrix', alliance_tag: 'TDR', permission: 'Battle Strat', roles: ['gather'], created_at: ts() },
   ];
 
   const accounts = [
@@ -129,6 +129,10 @@ function loadState() {
 }
 
 const state = loadState();
+// Backfill for state persisted before the `roles` field existed.
+state.players.forEach((p) => {
+  if (!p.roles) p.roles = [];
+});
 
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -179,6 +183,14 @@ export async function updatePlayerPermission(id, permission) {
   const idx = state.players.findIndex((p) => p.id === id);
   if (idx === -1) throw new Error(`Player "${id}" not found.`);
   state.players[idx] = { ...state.players[idx], permission };
+  persist();
+  return state.players[idx];
+}
+
+export async function updatePlayerRoles(id, roles) {
+  const idx = state.players.findIndex((p) => p.id === id);
+  if (idx === -1) throw new Error(`Player "${id}" not found.`);
+  state.players[idx] = { ...state.players[idx], roles };
   persist();
   return state.players[idx];
 }

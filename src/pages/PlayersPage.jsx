@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useAppData } from '../context/AppDataContext';
 import { permissionClass } from '../lib/utils';
+import { ROLE_DEFS } from '../data/roleDefs';
+import RoleMultiSelect from '../components/common/RoleMultiSelect';
+import MultiSelectFilter from '../components/common/MultiSelectFilter';
 
 const PERMISSION_LEVELS = ['Admin', 'Team Maker', 'Battle Strat', 'Player Manager', 'Players'];
 
@@ -13,10 +16,12 @@ const TRASH_ICON = (
 );
 
 export default function PlayersPage() {
-  const { players, alliances, isCurrentUserAdmin, setPlayerPermission, removePlayer } = useAppData();
+  const { players, alliances, isCurrentUserAdmin, setPlayerPermission, setPlayerRoles, removePlayer } =
+    useAppData();
   const [search, setSearch] = useState('');
-  const [permFilter, setPermFilter] = useState('all');
-  const [allianceFilter, setAllianceFilter] = useState('all');
+  const [permFilter, setPermFilter] = useState([]);
+  const [allianceFilter, setAllianceFilter] = useState([]);
+  const [roleFilter, setRoleFilter] = useState([]);
 
   const allianceColor = (tag) => alliances.find((a) => a.tag === tag)?.color || 'var(--text-dimmer)';
 
@@ -24,11 +29,20 @@ export default function PlayersPage() {
     const term = search.trim().toLowerCase();
     return players.filter((p) => {
       const matchesSearch = !term || p.name.toLowerCase().includes(term) || p.id.toLowerCase().includes(term);
-      const matchesPerm = permFilter === 'all' || p.permission === permFilter;
-      const matchesAlliance = allianceFilter === 'all' || p.alliance_tag === allianceFilter;
-      return matchesSearch && matchesPerm && matchesAlliance;
+      const matchesPerm = permFilter.length === 0 || permFilter.includes(p.permission);
+      const matchesAlliance = allianceFilter.length === 0 || allianceFilter.includes(p.alliance_tag);
+      const matchesRole = roleFilter.length === 0 || (p.roles || []).some((r) => roleFilter.includes(r));
+      return matchesSearch && matchesPerm && matchesAlliance && matchesRole;
     });
-  }, [players, search, permFilter, allianceFilter]);
+  }, [players, search, permFilter, allianceFilter, roleFilter]);
+
+  function handleRoleToggle(player, roleId) {
+    const current = player.roles || [];
+    const next = current.includes(roleId)
+      ? current.filter((r) => r !== roleId)
+      : [...current, roleId];
+    setPlayerRoles(player.id, next);
+  }
 
   function handleDelete(player) {
     if (window.confirm(`Remove ${player.name} from the registered players list?`)) {
@@ -58,22 +72,24 @@ export default function PlayersPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select value={permFilter} onChange={(e) => setPermFilter(e.target.value)}>
-          <option value="all">All Permissions</option>
-          {PERMISSION_LEVELS.map((lvl) => (
-            <option key={lvl} value={lvl}>
-              {lvl}
-            </option>
-          ))}
-        </select>
-        <select value={allianceFilter} onChange={(e) => setAllianceFilter(e.target.value)}>
-          <option value="all">All Alliances</option>
-          {alliances.map((a) => (
-            <option key={a.tag} value={a.tag}>
-              {a.tag}
-            </option>
-          ))}
-        </select>
+        <MultiSelectFilter
+          allLabel="All Permissions"
+          options={PERMISSION_LEVELS.map((lvl) => ({ id: lvl, label: lvl }))}
+          selected={permFilter}
+          onChange={setPermFilter}
+        />
+        <MultiSelectFilter
+          allLabel="All Alliances"
+          options={alliances.map((a) => ({ id: a.tag, label: a.tag, dotColor: a.color }))}
+          selected={allianceFilter}
+          onChange={setAllianceFilter}
+        />
+        <MultiSelectFilter
+          allLabel="All Roles"
+          options={ROLE_DEFS.map((role) => ({ id: role.id, label: role.label, dotClassName: role.id }))}
+          selected={roleFilter}
+          onChange={setRoleFilter}
+        />
       </div>
 
       <div className="card" style={{ padding: 0 }}>
@@ -83,6 +99,7 @@ export default function PlayersPage() {
             <div>Alliance</div>
             <div>ID</div>
             <div>Permission</div>
+            <div>Roles</div>
             <div className="col-action" />
           </div>
           <div>
@@ -116,6 +133,11 @@ export default function PlayersPage() {
                     <span className={`perm-badge ${permissionClass(p.permission)}`}>{p.permission}</span>
                   )}
                 </div>
+                <RoleMultiSelect
+                  roles={p.roles || []}
+                  editable={isCurrentUserAdmin}
+                  onToggle={(roleId) => handleRoleToggle(p, roleId)}
+                />
                 <div className="col-action">
                   <button className="btn-delete-icon" title="Remove player" onClick={() => handleDelete(p)}>
                     {TRASH_ICON}
