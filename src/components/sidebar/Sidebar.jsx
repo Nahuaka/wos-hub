@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useAuth } from '../../context/AuthContext';
+import { useClickOutside } from '../../hooks/useClickOutside';
 import AccountRow from './AccountRow';
 import SidebarEventRow from './SidebarEventRow';
 import AddAccountModal from './AddAccountModal';
@@ -21,6 +23,14 @@ const EVENTS_ICON = (
   </svg>
 );
 
+const TRASH_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18" />
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+  </svg>
+);
+
 const SETTINGS_ICON = (
   <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="3" />
@@ -29,10 +39,15 @@ const SETTINGS_ICON = (
 );
 
 export default function Sidebar() {
-  const { accounts, currentAccountKey, setCurrentAccountKey, events } = useAppData();
+  const { myAccounts, currentAccountKey, setCurrentAccountKey, removeAccount, events } = useAppData();
+  const { logout } = useAuth();
   const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null); // { account, x, y } | null
+  const contextMenuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  useClickOutside(contextMenuRef, !!contextMenu, () => setContextMenu(null));
 
   // Admin pages (Players, Event Management, Settings) are their own
   // distinct views - an account row shouldn't show as "active" alongside
@@ -44,6 +59,20 @@ export default function Sidebar() {
     setCurrentAccountKey(key);
     if (onAdminPage) {
       navigate('/overview');
+    }
+  }
+
+  function handleAccountContextMenu(e, account) {
+    e.preventDefault();
+    setContextMenu({ account, x: e.clientX, y: e.clientY });
+  }
+
+  function handleDeleteAccount() {
+    if (!contextMenu) return;
+    const { account } = contextMenu;
+    setContextMenu(null);
+    if (window.confirm(`Delete ${account.name}? This can't be undone.`)) {
+      removeAccount(account.key);
     }
   }
 
@@ -63,12 +92,13 @@ export default function Sidebar() {
 
       <div className="section-label">ACCOUNTS</div>
       <div id="accountsList">
-        {accounts.map((account) => (
+        {myAccounts.map((account) => (
           <AccountRow
             key={account.key}
             account={account}
             active={!onAdminPage && account.key === currentAccountKey}
             onSelect={handleAccountSelect}
+            onContextMenu={handleAccountContextMenu}
           />
         ))}
       </div>
@@ -104,7 +134,7 @@ export default function Sidebar() {
       </NavLink>
 
       <div className="sidebar-footer">
-        <div className="logout">
+        <div className="logout" onClick={logout}>
           <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <path d="M16 17l5-5-5-5" />
@@ -115,6 +145,19 @@ export default function Sidebar() {
       </div>
 
       <AddAccountModal open={addAccountOpen} onClose={() => setAddAccountOpen(false)} />
+
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <button type="button" className="context-menu-item danger" onClick={handleDeleteAccount}>
+            {TRASH_ICON}
+            Delete Account
+          </button>
+        </div>
+      )}
     </div>
   );
 }

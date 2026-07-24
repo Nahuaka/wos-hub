@@ -65,6 +65,38 @@ export async function updatePlayerRoles(id, roles) {
   return data;
 }
 
+export async function updatePlayerInfo(id, patch) {
+  const { data, error } = await supabase.from('players').update(patch).eq('id', id).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function insertPlayer(player) {
+  const { data, error } = await supabase.from('players').insert(player).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function linkPlayerAuthUser(id, authUserId, ownerPlayerId = null) {
+  const { data, error } = await supabase
+    .from('players')
+    .update({ auth_user_id: authUserId, owner_player_id: ownerPlayerId })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// Pre-login existence/prefill check, via a security-definer RPC so
+// unauthenticated visitors can use it without opening players/accounts to
+// anonymous reads (see get_player_registration_status in schema.sql).
+export async function checkPlayerRegistrationStatus(id) {
+  const { data, error } = await supabase.rpc('get_player_registration_status', { p_id: id });
+  if (error) throw error;
+  return data;
+}
+
 export async function deletePlayer(id) {
   const { error } = await supabase.from('players').delete().eq('id', id);
   if (error) throw error;

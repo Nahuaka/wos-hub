@@ -1,13 +1,22 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as api from '../lib/api';
+import * as authApi from '../lib/authApi';
 import { slugify, eventSlug } from '../lib/utils';
 import { freshTroopState } from '../data/troopDefs';
 import { freshRallyState } from '../data/rallyDefs';
 import { freshHeroState } from '../data/heroRoster';
+import { useAuth } from './AuthContext';
 
 const AppDataContext = createContext(null);
 
+// A player's own root: the ID they first registered/claimed with, if this
+// one was added later as an alt (owner_player_id set), otherwise itself.
+function ownerRootOf(player) {
+  return player ? player.owner_player_id || player.id : null;
+}
+
 export function AppDataProvider({ children }) {
+  const { currentAuthUserId } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [currentAccountKey, setCurrentAccountKey] = useState(null);
   const [players, setPlayers] = useState([]);
@@ -34,9 +43,15 @@ export function AppDataProvider({ children }) {
         setPlayers(playersData);
         setAlliances(alliancesData);
         setEvents(eventsData);
-        if (accountsData.length > 0) {
-          setCurrentAccountKey(accountsData[0].key);
-        }
+        // Default to one of my own accounts, not just whichever account
+        // happens to be first overall.
+        const myPlayerAtLoad = playersData.find((p) => p.auth_user_id === currentAuthUserId);
+        const myRootAtLoad = ownerRootOf(myPlayerAtLoad);
+        const myFirstAccount = accountsData.find((a) => {
+          const p = playersData.find((pp) => pp.id === a.player_id);
+          return p && ownerRootOf(p) === myRootAtLoad;
+        });
+        setCurrentAccountKey((myFirstAccount || accountsData[0])?.key ?? null);
       } catch (err) {
         if (!cancelled) setError(err);
       } finally {
@@ -48,11 +63,27 @@ export function AppDataProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentAuthUserId]);
 
   const currentAccount = useMemo(
     () => accounts.find((a) => a.key === currentAccountKey) || null,
     [accounts, currentAccountKey]
+  );
+
+  const myOwnerRoot = useMemo(() => {
+    const myPlayer = players.find((p) => p.auth_user_id === currentAuthUserId);
+    return ownerRootOf(myPlayer);
+  }, [players, currentAuthUserId]);
+
+  // The sidebar only shows accounts belonging to the logged-in player's own
+  // group of IDs (see owner_player_id), not every account in the alliance.
+  const myAccounts = useMemo(
+    () =>
+      accounts.filter((a) => {
+        const p = players.find((pp) => pp.id === a.player_id);
+        return p && ownerRootOf(p) === myOwnerRoot;
+      }),
+    [accounts, players, myOwnerRoot]
   );
 
   const isCurrentUserAdmin = useMemo(() => {
@@ -100,16 +131,58 @@ export function AppDataProvider({ children }) {
     [currentAccountKey]
   );
 
+  // Adding an alt with a player ID claims it under the current login. Each
+  // player ID authenticates via its own synthetic email (see utils.js), so
+  // "claiming" one means giving it a real signup of its own - not just
+  // copying the current session's auth_user_id, which would leave that ID
+  // with no way to actually sign in later. `password` is a fresh
+  // confirmation from the user (not the one they logged in with, which we
+  // never keep around) used only for this new signup; every claimed ID
+  // ends up with the same password by construction. Whoever calls this is
+  // expected to have already blocked IDs that are linked to someone else.
   const createAccount = useCallback(
-    async ({ name, playerId, power, march, troops }) => {
+    async ({ name, playerId, power, march, troops, existingAccountKey, password }) => {
+      const resolvedPlayerId = playerId || null;
+      if (resolvedPlayerId) {
+        const existingPlayer = players.find((p) => p.id === resolvedPlayerId);
+        if (!existingPlayer) {
+          const { user } = await authApi.signUp(resolvedPlayerId, password);
+          const newPlayer = await api.insertPlayer({
+            id: resolvedPlayerId,
+            name,
+            alliance_tag: null,
+            permission: 'Players',
+            roles: [],
+            auth_user_id: user.id,
+            // Group this new alt under my own root ID, so it shows up in
+            // my sidebar and I can add further alts starting from it too.
+            owner_player_id: myOwnerRoot,
+          });
+          setPlayers((prev) => [...prev, newPlayer]);
+        } else if (!existingPlayer.auth_user_id) {
+          const { user } = await authApi.signUp(resolvedPlayerId, password);
+          const linked = await api.linkPlayerAuthUser(resolvedPlayerId, user.id, myOwnerRoot);
+          setPlayers((prev) => prev.map((p) => (p.id === resolvedPlayerId ? linked : p)));
+        }
+      }
+
+      if (existingAccountKey) {
+        const patch = { name, power: power || '0', march: march || '0', troops: troops || freshTroopState() };
+        setAccounts((prev) => prev.map((a) => (a.key === existingAccountKey ? { ...a, ...patch } : a)));
+        const saved = await api.updateAccount(existingAccountKey, patch);
+        setAccounts((prev) => prev.map((a) => (a.key === existingAccountKey ? saved : a)));
+        setCurrentAccountKey(saved.key);
+        return saved;
+      }
+
       const key = slugify(name, accounts.map((a) => a.key));
       const newAccount = {
         key,
-        player_id: playerId || null,
+        player_id: resolvedPlayerId,
         name,
         power: power || '0',
         march: march || '0',
-        furnace: 1,
+        furnace: '1',
         rally_lead: true,
         snow_ape_level: 1,
         troops: troops || freshTroopState(),
@@ -121,8 +194,43 @@ export function AppDataProvider({ children }) {
       setCurrentAccountKey(saved.key);
       return saved;
     },
-    [accounts]
+    [accounts, players, myOwnerRoot]
   );
+
+  const removeAccount = useCallback(
+    (key) => {
+      setAccounts((prev) => {
+        const next = prev.filter((a) => a.key !== key);
+        if (currentAccountKey === key) {
+          const fallback = next.find((a) => {
+            const p = players.find((pp) => pp.id === a.player_id);
+            return p && ownerRootOf(p) === myOwnerRoot;
+          });
+          setCurrentAccountKey(fallback ? fallback.key : null);
+        }
+        return next;
+      });
+      api.deleteAccount(key).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to delete account:', err);
+      });
+    },
+    [currentAccountKey, players, myOwnerRoot]
+  );
+
+  // Admin-only "Add Player" - a bare, unclaimed record (no auth_user_id).
+  const addPlayer = useCallback(async ({ id, name, allianceTag, permission }) => {
+    const saved = await api.insertPlayer({
+      id,
+      name,
+      alliance_tag: allianceTag || null,
+      permission: permission || 'Players',
+      roles: [],
+      auth_user_id: null,
+    });
+    setPlayers((prev) => [...prev, saved]);
+    return saved;
+  }, []);
 
   // ---- Players ----
   const setPlayerPermission = useCallback((id, permission) => {
@@ -209,6 +317,7 @@ export function AppDataProvider({ children }) {
     loading,
     error,
     accounts,
+    myAccounts,
     currentAccount,
     currentAccountKey,
     setCurrentAccountKey,
@@ -217,9 +326,11 @@ export function AppDataProvider({ children }) {
     patchCurrentAccount,
     patchCurrentAccountJson,
     createAccount,
+    removeAccount,
     players,
     setPlayerPermission,
     setPlayerRoles,
+    addPlayer,
     removePlayer,
     alliances,
     addAlliance,

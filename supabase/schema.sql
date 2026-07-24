@@ -22,6 +22,18 @@ create table if not exists players (
                check (permission in ('Admin','Team Maker','Battle Strat','Player Manager','Players')),
   -- Any combination of: 'rally-lead','potential-rally-lead','joiner','looter','gather'.
   roles        jsonb not null default '[]'::jsonb,
+  -- Each player ID that can log in has its OWN auth user (Supabase Auth has
+  -- one email per user, and each ID maps to its own synthetic email - see
+  -- toSyntheticEmail in utils.js), even when several IDs belong to the same
+  -- real person and share a password. Null means this player ID has no
+  -- password yet (e.g. an admin added the record, or another player added
+  -- it as an alt without claiming it).
+  auth_user_id     uuid references auth.users(id) on delete set null,
+  -- Groups a person's own player IDs together, since auth_user_id can't:
+  -- the ID they first registered/claimed with is its own owner (null here),
+  -- and every alt they subsequently add points back at that root ID. Used
+  -- to scope the sidebar's account list to "my accounts" after login.
+  owner_player_id  text references players(id) on delete set null,
   created_at   timestamptz not null default now()
 );
 
@@ -56,7 +68,7 @@ create table if not exists accounts (
   name            text not null,
   power           text not null default '0',
   march           text not null default '0',
-  furnace         integer not null default 1,
+  furnace         text not null default '1', -- e.g. '30', '30-4' (some furnace tiers include a letter/dash suffix)
   rally_lead      boolean not null default true,
   snow_ape_level  integer not null default 1 check (snow_ape_level between 1 and 10),
   troops          jsonb not null default '{}'::jsonb,
@@ -111,8 +123,11 @@ alter table players   enable row level security;
 alter table accounts  enable row level security;
 alter table events    enable row level security;
 
-create policy "alliances: read for authenticated" on alliances
-  for select using (auth.role() = 'authenticated');
+-- Public read: tags/colors carry no sensitive info, and the registration
+-- form needs to populate an alliance picker before the visitor has logged
+-- in at all.
+create policy "alliances: public read" on alliances
+  for select using (true);
 create policy "alliances: write for authenticated" on alliances
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
@@ -130,3 +145,56 @@ create policy "events: read for authenticated" on events
   for select using (auth.role() = 'authenticated');
 create policy "events: write for authenticated" on events
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- ---------------------------------------------------------------------------
+-- Registration status check, callable before login
+--
+-- The login/registration screen needs to know, for a given player ID typed
+-- by a not-yet-authenticated visitor: does it exist, and is it already
+-- linked to a password? Rather than opening `players`/`accounts` to
+-- anonymous reads, this single security-definer function (owned by the
+-- table owner, so it bypasses RLS internally) answers just that question -
+-- direct table access stays authenticated-only exactly as above.
+--
+-- Returns one of:
+--   {status: 'not_found'}
+--   {status: 'linked'}                         -- no player/account data leaked
+--   {status: 'unlinked', player: {...}, account: {...} | null}
+-- ---------------------------------------------------------------------------
+create or replace function get_player_registration_status(p_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_player  players%rowtype;
+  v_account accounts%rowtype;
+begin
+  select * into v_player from players where id = p_id;
+
+  if not found then
+    return jsonb_build_object('status', 'not_found');
+  end if;
+
+  if v_player.auth_user_id is not null then
+    return jsonb_build_object('status', 'linked');
+  end if;
+
+  select * into v_account from accounts where player_id = p_id limit 1;
+
+  return jsonb_build_object(
+    'status', 'unlinked',
+    'player', jsonb_build_object(
+      'id', v_player.id,
+      'name', v_player.name,
+      'alliance_tag', v_player.alliance_tag,
+      'permission', v_player.permission,
+      'roles', v_player.roles
+    ),
+    'account', case when found then to_jsonb(v_account) else null end
+  );
+end;
+$$;
+
+grant execute on function get_player_registration_status(text) to anon, authenticated;

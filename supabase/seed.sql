@@ -20,7 +20,7 @@ on conflict (id) do nothing;
 
 insert into accounts (key, player_id, name, power, march, furnace, rally_lead, snow_ape_level, troops, rally, heroes) values
 (
-  'icewarden', '80472391', '[FLG] ICEWARDEN', '142.8M', '250,000', 30, true, 1,
+  'icewarden', '80472391', '[FLG] ICEWARDEN', '142.8M', '250,000', '30', true, 1,
   '{
     "infantry": {"fc": "FC1", "tier": "T11", "skill": 0},
     "lancer":   {"fc": "FC1", "tier": "T11", "skill": 0},
@@ -44,7 +44,7 @@ insert into accounts (key, player_id, name, power, march, furnace, rally_lead, s
   '{}'::jsonb
 ),
 (
-  'frostbyte', '80472455', '[FLG] FROSTBYTE', '98.4M', '180,000', 25, true, 1,
+  'frostbyte', '80472455', '[FLG] FROSTBYTE', '98.4M', '180,000', '25', true, 1,
   '{
     "infantry": {"fc": "FC1", "tier": "T11", "skill": 0},
     "lancer":   {"fc": "FC1", "tier": "T11", "skill": 0},
