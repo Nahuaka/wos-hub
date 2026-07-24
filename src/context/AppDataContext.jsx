@@ -133,6 +133,14 @@ export function AppDataProvider({ children }) {
     });
   }, []);
 
+  const setPlayerRoles = useCallback((id, roles) => {
+    setPlayers((prev) => prev.map((p) => (p.id === id ? { ...p, roles } : p)));
+    api.updatePlayerRoles(id, roles).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update player roles:', err);
+    });
+  }, []);
+
   const removePlayer = useCallback((id) => {
     setPlayers((prev) => prev.filter((p) => p.id !== id));
     api.deletePlayer(id).catch((err) => {
@@ -211,6 +219,7 @@ export function AppDataProvider({ children }) {
     createAccount,
     players,
     setPlayerPermission,
+    setPlayerRoles,
     removePlayer,
     alliances,
     addAlliance,

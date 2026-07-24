@@ -13,6 +13,7 @@ export const {
   deleteAccount,
   fetchPlayers,
   updatePlayerPermission,
+  updatePlayerRoles,
   deletePlayer,
   fetchAlliances,
   insertAlliance,

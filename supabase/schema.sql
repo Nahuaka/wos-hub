@@ -20,6 +20,8 @@ create table if not exists players (
   alliance_tag text references alliances(tag) on delete set null,
   permission   text not null default 'Players'
                check (permission in ('Admin','Team Maker','Battle Strat','Player Manager','Players')),
+  -- Any combination of: 'rally-lead','potential-rally-lead','joiner','looter','gather'.
+  roles        jsonb not null default '[]'::jsonb,
   created_at   timestamptz not null default now()
 );
 

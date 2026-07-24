@@ -892,7 +892,7 @@
   .players-table{ width:100%; }
   .players-table-head{
     display:grid;
-    grid-template-columns: 1.6fr 1fr 1fr 1.3fr 90px;
+    grid-template-columns: 1.4fr 0.8fr 1fr 1.1fr 1.8fr 90px;
     gap:12px;
     padding:14px 22px;
     font-size:10.5px;
@@ -903,17 +903,24 @@
   }
   .players-row{
     display:grid;
-    grid-template-columns: 1.6fr 1fr 1fr 1.3fr 90px;
+    grid-template-columns: 1.4fr 0.8fr 1fr 1.1fr 1.8fr 90px;
     gap:12px;
     align-items:center;
     padding:16px 22px;
     border-bottom:1px solid var(--border-soft);
   }
+  /* Grid items default to a content-based minimum width, so a long value in
+     any one row (a long role list, a long permission label) would force
+     that row's columns wider than every other row's, breaking alignment
+     across rows. Zeroing it out lets each column stay locked to its
+     grid-template-columns share and truncate/wrap its own content instead. */
+  .players-table-head > *,
+  .players-row > *{ min-width:0; }
   .players-row:last-child{ border-bottom:none; }
-  .players-row .p-name{ font-weight:700; font-size:14px; }
+  .players-row .p-name{ font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .players-row .p-alliance{ color:var(--text-dim); font-size:13px; display:flex; align-items:center; gap:7px; }
   .p-alliance-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; display:inline-block; }
-  .players-row .p-id{ color:var(--text-dimmer); font-size:13px; }
+  .players-row .p-id{ color:var(--text-dimmer); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   .perm-badge{
     display:inline-block;
@@ -928,6 +935,8 @@
   .perm-badge.players{ background: rgba(124,135,152,0.12); color: var(--text-dim); border:1px solid rgba(124,135,152,0.25); }
 
   .perm-select{
+    width:100%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     font-family:inherit;
     font-size:11px; font-weight:800; letter-spacing:0.4px;
     padding:5px 26px 5px 10px;
@@ -944,6 +953,96 @@
   .perm-select.battle-strat{ background-color: rgba(255,157,66,0.12); color: var(--orange); border:1px solid rgba(255,157,66,0.3); }
   .perm-select.player-manager{ background-color: rgba(108,155,255,0.12); color:#6c9bff; border:1px solid rgba(108,155,255,0.3); }
   .perm-select.players{ background-color: rgba(124,135,152,0.12); color: var(--text-dim); border:1px solid rgba(124,135,152,0.25); }
+
+  .role-chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .role-chip{
+    font-family:inherit;
+    font-size:10px; font-weight:800; letter-spacing:0.3px;
+    padding:4px 9px; border-radius:6px;
+    border:1px solid var(--border-soft);
+    background: transparent;
+    color: var(--text-dimmer);
+    white-space:nowrap;
+    cursor:pointer;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  button.role-chip:hover{ border-color: var(--text-dimmer); color: var(--text-dim); }
+  .role-chip.readonly{ cursor:default; }
+  .role-chip.active.rally-lead{ background: rgba(61,220,151,0.12); color: var(--teal); border-color: rgba(61,220,151,0.3); }
+  .role-chip.active.potential-rally-lead{ background: rgba(176,155,255,0.12); color: var(--purple); border-color: rgba(176,155,255,0.3); }
+  .role-chip.active.joiner{ background: rgba(255,157,66,0.12); color: var(--orange); border-color: rgba(255,157,66,0.3); }
+  .role-chip.active.looter{ background: rgba(255,201,74,0.12); color: var(--gold); border-color: rgba(255,201,74,0.3); }
+  .role-chip.active.gather{ background: rgba(255,107,107,0.12); color: var(--red); border-color: rgba(255,107,107,0.3); }
+  .role-chip-empty{ font-size:12px; color: var(--text-dimmer); }
+
+  /* Generic checkbox-dropdown chrome, shared by the per-row role editor
+     (RoleMultiSelect) and the toolbar filters (MultiSelectFilter). */
+  .multi-select{ position:relative; min-width:0; }
+  .multi-select summary{
+    list-style:none;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background: var(--panel);
+    border:1px solid var(--border-soft);
+    border-radius:8px;
+    padding:8px 10px;
+    font-size:12.5px;
+    color: var(--text-dim);
+    cursor:pointer;
+    user-select:none;
+    transition: border-color .15s;
+  }
+  .multi-select summary::-webkit-details-marker{ display:none; }
+  .multi-select:hover summary{ border-color: var(--text-dimmer); }
+  .multi-select[open] summary{ border-color: var(--teal); }
+  .multi-select-summary-text{
+    min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .multi-select-chevron{ width:14px; height:14px; flex-shrink:0; color:var(--text-dimmer); transition:transform .15s; }
+  .multi-select[open] .multi-select-chevron{ transform:rotate(180deg); }
+  .multi-select-menu{
+    position:absolute; top:calc(100% + 6px); left:0; z-index:20;
+    min-width:220px;
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:8px;
+    box-shadow:0 12px 28px rgba(0,0,0,0.45);
+  }
+  .multi-select-option{
+    display:flex; align-items:center; gap:9px;
+    padding:8px 8px;
+    border-radius:7px;
+    font-size:13px;
+    color: var(--text);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .multi-select-option:hover{ background: rgba(255,255,255,0.04); }
+  .multi-select-option input[type="checkbox"]{
+    width:15px; height:15px;
+    accent-color: var(--teal);
+    cursor:pointer;
+    flex-shrink:0;
+  }
+
+  /* Toolbar filter variant - matches the look of the plain <select> filters
+     it replaced (fixed-ish width instead of shrinking to the row track). */
+  .filter-multi-select{ width:200px; flex-shrink:0; }
+  .filter-multi-select .multi-select-summary{
+    border-radius:9px;
+    padding:9px 14px;
+    font-size:13px;
+    font-weight:600;
+  }
+  .filter-multi-select .multi-select-menu{ min-width:100%; }
+
+  .role-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; background: var(--text-dimmer); }
+  .role-dot.rally-lead{ background: var(--teal); }
+  .role-dot.potential-rally-lead{ background: var(--purple); }
+  .role-dot.joiner{ background: var(--orange); }
+  .role-dot.looter{ background: var(--gold); }
+  .role-dot.gather{ background: var(--red); }
 
   .btn-delete-icon{
     background:transparent;

@@ -54,6 +54,17 @@ export async function updatePlayerPermission(id, permission) {
   return data;
 }
 
+export async function updatePlayerRoles(id, roles) {
+  const { data, error } = await supabase
+    .from('players')
+    .update({ roles })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function deletePlayer(id) {
   const { error } = await supabase.from('players').delete().eq('id', id);
   if (error) throw error;
